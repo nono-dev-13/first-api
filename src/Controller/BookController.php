@@ -16,20 +16,36 @@ use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use  Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
+use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
 class BookController extends AbstractController
 {
     #[Route('/api/books', name: 'book', methods:['GET'])]
-    public function getBookList(BookRepository $bookRepository, SerializerInterface $serializerInterface, Request $request): JsonResponse
+    public function getBookList(BookRepository $bookRepository, SerializerInterface $serializerInterface, Request $request, TagAwareCacheInterface $tagAwareCacheInterface): JsonResponse
     {
         
         $page = $request->get('page', 1);
         $limit = $request->get('limit', 3);
-        $bookList = $bookRepository->findAllWithPagination($page, $limit);
+        $idCache = "getAllBooks-" . $page . "-" . $limit;
+        
+        $jsonBookList = $tagAwareCacheInterface->get($idCache, function (ItemInterface $item) use ($bookRepository, $page, $limit, $serializerInterface) {
+            echo ("Mise en cache \n");
+            $item->tag("booksCache");
+            
+            // Pour éviter de mettre en cache les autres information comme l'auteur etc...
+            // return $bookRepository->findAllWithPagination($page, $limit);
+
+            // Je stocke dans une variable mon find
+            $bookList = $bookRepository->findAllWithPagination($page, $limit);
+
+            // Je return maintenant le json avec toutes les infos
+            return $serializerInterface->serialize($bookList, 'json', ['groups' => 'getBooks']); 
+        });
         
         
         //$bookList = $bookRepository->findAll();
-        $jsonBookList = $serializerInterface->serialize($bookList, 'json', ['groups' => 'getBooks']);
+        //$jsonBookList = $serializerInterface->serialize($bookList, 'json', ['groups' => 'getBooks']);
 
         return new JsonResponse($jsonBookList, Response::HTTP_OK, [], true);
     }
@@ -56,8 +72,9 @@ class BookController extends AbstractController
    // Delete avec la methode DELETE
    #[Route('/api/books/{id}', name: 'deleteBook', methods: ['DELETE'])]
    #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits suffisants pour supprimer un livre')]
-    public function deleteBook(Book $book, EntityManagerInterface $em): JsonResponse 
+    public function deleteBook(Book $book, EntityManagerInterface $em, TagAwareCacheInterface $tagAwareCacheInterface): JsonResponse 
     {
+        $tagAwareCacheInterface->invalidateTags(["booksCache"]);
         $em->remove($book);
         $em->flush();
 

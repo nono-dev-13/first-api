@@ -15,21 +15,21 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use  Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
 
 class BookController extends AbstractController
 {
     #[Route('/api/books', name: 'book', methods:['GET'])]
-    public function getBookList(BookRepository $bookRepository, SerializerInterface $serializerInterface): JsonResponse
+    public function getBookList(BookRepository $bookRepository, SerializerInterface $serializerInterface, Request $request): JsonResponse
     {
-        /*
-        return $this->json([
-            'message' => 'Welcome to your new controller!',
-            'path' => 'src/Controller/BookController.php',
-        ]);
-        */
-
-        $booklist = $bookRepository->findAll(); 
-        $jsonBookList = $serializerInterface->serialize($booklist, 'json', ['groups' => 'getBooks']);
+        
+        $page = $request->get('page', 1);
+        $limit = $request->get('limit', 3);
+        $bookList = $bookRepository->findAllWithPagination($page, $limit);
+        
+        
+        //$bookList = $bookRepository->findAll();
+        $jsonBookList = $serializerInterface->serialize($bookList, 'json', ['groups' => 'getBooks']);
 
         return new JsonResponse($jsonBookList, Response::HTTP_OK, [], true);
     }
@@ -55,6 +55,7 @@ class BookController extends AbstractController
 
    // Delete avec la methode DELETE
    #[Route('/api/books/{id}', name: 'deleteBook', methods: ['DELETE'])]
+   #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits suffisants pour supprimer un livre')]
     public function deleteBook(Book $book, EntityManagerInterface $em): JsonResponse 
     {
         $em->remove($book);
@@ -65,6 +66,7 @@ class BookController extends AbstractController
 
     // Création avec POST
     #[Route('/api/books', name:"createBook", methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits suffisants pour créer un livre')]
     public function createBook(Request $request, SerializerInterface $serializer, EntityManagerInterface $em, UrlGeneratorInterface $urlGenerator, AuthorRepository $authorRepository, ValidatorInterface $validator): JsonResponse 
     {
 

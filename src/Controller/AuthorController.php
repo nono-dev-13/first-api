@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Author;
 use App\Repository\AuthorRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,9 +20,14 @@ class AuthorController extends AbstractController
 {
     //retourne l'ensemble des auteurs
     #[Route('/api/authors', name: 'author', methods:['GET'])]
-    public function index(AuthorRepository $authorRepository, SerializerInterface $serializerInterface): JsonResponse
+    public function index(AuthorRepository $authorRepository, SerializerInterface $serializerInterface, Request $request): JsonResponse
     {
-        $authorList = $authorRepository->findAll();
+
+        //$authorList = $authorRepository->findAll();
+        $page = $request->get('page', 1);
+        $limit = $request->get('limit', 3);
+        $authorList = $authorRepository->findAllWithPagination($page, $limit);  
+        
         $jsonAuthorList = $serializerInterface->serialize($authorList, 'json', ['groups' => 'getAuthors']);
 
         return new JsonResponse($jsonAuthorList, Response::HTTP_OK, [], true);
@@ -48,6 +54,7 @@ class AuthorController extends AbstractController
 
    // Création avec POST
    #[Route('/api/authors', name:"createAuthors", methods: ['POST'])]
+   #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits suffisants pour créer un auteur')]
    public function createAuthor(Request $request, SerializerInterface $serializer, EntityManagerInterface $em, UrlGeneratorInterface $urlGenerator, ValidatorInterface $validator): JsonResponse 
    {
 

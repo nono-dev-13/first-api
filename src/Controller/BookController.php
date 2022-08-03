@@ -3,21 +3,25 @@
 namespace App\Controller;
 
 use App\Entity\Book;
+
+use JMS\Serializer\Serializer;
 use App\Repository\BookRepository;
 use App\Repository\AuthorRepository;
+use JMS\Serializer\SerializerInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use JMS\Serializer\SerializationContext;
+use Symfony\Contracts\Cache\ItemInterface;
+//use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 use  Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
-use Symfony\Contracts\Cache\ItemInterface;
-use Symfony\Contracts\Cache\TagAwareCacheInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 class BookController extends AbstractController
 {
@@ -40,10 +44,11 @@ class BookController extends AbstractController
             $bookList = $bookRepository->findAllWithPagination($page, $limit);
 
             // Je return maintenant le json avec toutes les infos
-            return $serializerInterface->serialize($bookList, 'json', ['groups' => 'getBooks']); 
+            $context = SerializationContext::create()->setGroups(['getBooks']);
+            return $serializerInterface->serialize($bookList, 'json', $context); 
         });
         
-        
+
         //$bookList = $bookRepository->findAll();
         //$jsonBookList = $serializerInterface->serialize($bookList, 'json', ['groups' => 'getBooks']);
 
@@ -65,7 +70,8 @@ class BookController extends AbstractController
         */
 
         // ici grace au param converter j'injecte direct l'entité au lieu de l'id
-        $jsonBook = $serializer->serialize($book, 'json', ['groups' => 'getBooks']);
+        $context = SerializationContext::create()->setGroups(['getBooks']);
+        $jsonBook = $serializer->serialize($book, 'json', $context);
         return new JsonResponse($jsonBook, Response::HTTP_OK, [], true);
     }
 
@@ -109,7 +115,8 @@ class BookController extends AbstractController
         $em->persist($book);
         $em->flush();
 
-        $jsonBook = $serializer->serialize($book, 'json', ['groups' => 'getBooks']);
+        $context = SerializationContext::create()->setGroups(['getBooks']);
+        $jsonBook = $serializer->serialize($book, 'json', $context);
         
         //Création de l'url
         $location = $urlGenerator->generate('detailBook', ['id' => $book->getId()], UrlGeneratorInterface::ABSOLUTE_URL);

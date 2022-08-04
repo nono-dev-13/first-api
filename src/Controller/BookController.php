@@ -7,6 +7,7 @@ use App\Entity\Book;
 use JMS\Serializer\Serializer;
 use App\Repository\BookRepository;
 use App\Repository\AuthorRepository;
+use App\Service\VersioningService;
 use JMS\Serializer\SerializerInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use JMS\Serializer\SerializationContext;
@@ -26,14 +27,14 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 class BookController extends AbstractController
 {
     #[Route('/api/books', name: 'book', methods:['GET'])]
-    public function getBookList(BookRepository $bookRepository, SerializerInterface $serializerInterface, Request $request, TagAwareCacheInterface $tagAwareCacheInterface): JsonResponse
+    public function getBookList(BookRepository $bookRepository, SerializerInterface $serializerInterface, Request $request, TagAwareCacheInterface $tagAwareCacheInterface, VersioningService $versioningService): JsonResponse
     {
         
         $page = $request->get('page', 1);
         $limit = $request->get('limit', 3);
         $idCache = "getAllBooks-" . $page . "-" . $limit;
         
-        $jsonBookList = $tagAwareCacheInterface->get($idCache, function (ItemInterface $item) use ($bookRepository, $page, $limit, $serializerInterface) {
+        $jsonBookList = $tagAwareCacheInterface->get($idCache, function (ItemInterface $item) use ($bookRepository, $page, $limit, $serializerInterface, $versioningService) {
             echo ("Mise en cache \n");
             $item->tag("booksCache");
             
@@ -44,7 +45,10 @@ class BookController extends AbstractController
             $bookList = $bookRepository->findAllWithPagination($page, $limit);
 
             // Je return maintenant le json avec toutes les infos
+            $version = $versioningService->getVersion(); 
             $context = SerializationContext::create()->setGroups(['getBooks']);
+            // je versionne (ici les commentaires dans l'entité BOOK)
+            $context->setVersion($version);
             return $serializerInterface->serialize($bookList, 'json', $context); 
         });
         
@@ -58,7 +62,7 @@ class BookController extends AbstractController
     // Récupération avec GET
     #[Route('/api/books/{id}', name: 'detailBook', methods: ['GET'])]
     //public function getDetailBook(int $id, SerializerInterface $serializer, BookRepository $bookRepository): JsonResponse {
-    public function getDetailBook(Book $book, SerializerInterface $serializer): JsonResponse {
+    public function getDetailBook(Book $book, SerializerInterface $serializer, VersioningService $versioningService): JsonResponse {
 
         /*
         $book = $bookRepository->find($id);
@@ -70,7 +74,10 @@ class BookController extends AbstractController
         */
 
         // ici grace au param converter j'injecte direct l'entité au lieu de l'id
+        $version = $versioningService->getVersion(); 
         $context = SerializationContext::create()->setGroups(['getBooks']);
+        // je versionne (ici les commentaires dans l'entité BOOK)
+        $context->setVersion($version);
         $jsonBook = $serializer->serialize($book, 'json', $context);
         return new JsonResponse($jsonBook, Response::HTTP_OK, [], true);
     }

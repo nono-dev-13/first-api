@@ -56,6 +56,7 @@ class AppFixtures extends Fixture
             $livre->setTitle('Livre ' . $i);
             $livre->setCoverText('Quatrième de couverture numéro : ' . $i);
             $livre->setAuthor($listAuthor[array_rand($listAuthor)]);
+            $livre->setComment($faker->text(50)); 
             
             $manager->persist($livre);
         }

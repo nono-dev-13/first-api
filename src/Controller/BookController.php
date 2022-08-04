@@ -125,6 +125,7 @@ class BookController extends AbstractController
     }
 
     // Modifie avec PUT
+    /*
     #[Route('/api/books/{id}', name:"updateBook", methods:['PUT'])]
     public function updateBook(Request $request, SerializerInterface $serializer, Book $currentBook, EntityManagerInterface $em, AuthorRepository $authorRepository): JsonResponse 
     {
@@ -140,4 +141,33 @@ class BookController extends AbstractController
         $em->flush();
         return new JsonResponse(null, JsonResponse::HTTP_NO_CONTENT);
    }
+   */
+
+  #[Route('/api/books/{id}', name:"updateBook", methods:['PUT'])]
+  #[IsGranted('ROLE_ADMIN', message: 'Vous n\'avez pas les droits suffisants pour éditer un livre')]
+  public function updateBook(Request $request, SerializerInterface $serializer, Book $currentBook, EntityManagerInterface $em, AuthorRepository $authorRepository, ValidatorInterface $validator, TagAwareCacheInterface $cache): JsonResponse 
+  {
+      $newBook = $serializer->deserialize($request->getContent(), Book::class, 'json');
+      $currentBook->setTitle($newBook->getTitle());
+      $currentBook->setCoverText($newBook->getCoverText());
+
+      // On vérifie les erreurs
+      $errors = $validator->validate($currentBook);
+      if ($errors->count() > 0) {
+          return new JsonResponse($serializer->serialize($errors, 'json'), JsonResponse::HTTP_BAD_REQUEST, [], true);
+      }
+
+      $content = $request->toArray();
+      $idAuthor = $content['idAuthor'] ?? -1;
+  
+      $currentBook->setAuthor($authorRepository->find($idAuthor));
+
+      $em->persist($currentBook);
+      $em->flush();
+
+      // On vide le cache.
+      $cache->invalidateTags(["booksCache"]);
+
+      return new JsonResponse(null, JsonResponse::HTTP_NO_CONTENT);
+  }
 }
